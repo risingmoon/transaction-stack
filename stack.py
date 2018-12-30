@@ -13,37 +13,42 @@ class TransactionStack(Stack):
     def __init__(self):
         super().__init__()
         self.state = TransactionStack.NONE
+        self.transaction_indices = []
         self.transactions = []
-        self.tmp = []
 
     def __str__(self):
         return str(self[-1] if self else [])
 
     def begin(self):
-        self.transactions.append(len(self))
+        self.transaction_indices.append(len(self.transactions))
 
     def commit(self):
-        self.transactions.pop()
+        if self.transaction_indices:
+            index = self.transaction_indices.pop()
+            while len(self.transactions) != index:
+                self.transactions.pop()
+        else:
+            self.state = TransactionStack.NONE
 
     def rollback(self):
-        if self.transactions:
-            index = self.transactions.pop()
+        if self.transaction_indices:
+            index = self.transaction_indices.pop()
             self.state = TransactionStack.ROLLBACK
-            while len(self) != index:
-                action, value = self.tmp.pop()
-                if action == 'pop':
-                    getattr(self, action)()
-                else:
-                    getattr(self, action)(value)
+            while len(self.transactions) != index:
+                transaction, value = self.transactions.pop()
+                if transaction == TransactionStack.POP:
+                    getattr(self, transaction)()
+                if transaction == TransactionStack.PUSH:
+                    getattr(self, transaction)(value)
             self.state = TransactionStack.NONE
 
     def push(self, value):
         super().append(value)
-        if self.transactions and self.state != TransactionStack.ROLLBACK:
-            self.tmp.append((TransactionStack.POP, None))
+        if self.transaction_indices and self.state != TransactionStack.ROLLBACK:
+            self.transactions.append((TransactionStack.POP, None))
 
     def pop(self):
         value = super().pop()
-        if self.transactions and self.state != TransactionStack.ROLLBACK:
-            self.tmp.append((TransactionStack.PUSH, value))
+        if self.transaction_indices and self.state != TransactionStack.ROLLBACK:
+            self.transactions.append((TransactionStack.PUSH, value))
 
